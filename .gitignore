@@ -1,0 +1,8 @@
+*.pyd
+*.lib
+*.dll
+*.html
+__pycache__
+x64
+.vs
+build

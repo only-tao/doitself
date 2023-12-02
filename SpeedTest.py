@@ -35,8 +35,8 @@ dictTest ={
         'calSquareRootAndSquare_JIT'  : 'Numba JIT',
         'calSquareRootAndSquare_AOT'  : 'Numba AOT',
         'calSRaddS_CY'   : 'Cython Module',
-        'calSquareRootAndSquare_PyC'  : 'C Module VC',
-        'calSquareRootAndSquare_PyCG' : 'C Module GCC',
+        'calSRaddS_PyC'  : 'C Module VC',
+        'calSRaddS_PyCG' : 'C Module GCC',
         'calSquareRootAndSquare_DLL'  : 'ctypes DLL VC',
         'calSquareRootAndSquare_DLL_gcc' : 'ctypes DLL GCC',
         'calSquareRootAndSquare_OMP'  : 'ctypes DLL VC OpenMP',
@@ -79,6 +79,16 @@ def calSRaddS_CY(N):
     result = np.empty((N,),dtype=np.float64)   
     calSquareRootAndSquare_CY(N,result)
     return result
+def calSRaddS_PyC(N):
+    result = np.zeros(N,dtype=np.float64)   
+    calSquareRootAndSquare_PyC(N,result)
+    return result
+def calSRaddS_PyCG(N):
+    result = np.empty((N,),dtype=np.float64)   
+    calSquareRootAndSquare_PyCG(N,result)
+    return result
+
+
 @njit
 def calSquareRootAndSquare_JIT(N):
     result = np.zeros(N, dtype=np.float64)
@@ -87,8 +97,8 @@ def calSquareRootAndSquare_JIT(N):
     return result
 
 def calSquareRootAndSquare_OP(N):
-    x1 = np.array(range(N))
-    x2 = np.array(range(N))
+    x1 = np.array(range(N),dtype=float)
+    x2 = np.array(range(N),dtype=float)
     x1 = np.sqrt(x1) 
     x2 = np.power(x2,2)
     result = x1 + x2
@@ -130,11 +140,14 @@ def printDiff(d1,d2):
             
 def checkRet(dictRet): # check the same answer!!
     listKey = list(dictRet.keys())
+    print(listKey)
     number = len(listKey)
-    for i in range(number-1):
+    for i in range(number-1): # n^2的比较。。。
         for n in range(i+1,number):
             keyi = listKey[i]
             keyn = listKey[n]
+            # print(keyi,keyn)
+            # print(dic)
             if (dictRet[keyi].size != dictRet[keyn].size):
                 print('checkRet size difference {} : {} != {} : {} '.format(keyi, dictRet[keyi].size, keyn, dictRet[keyn].size))
                 return False
@@ -212,15 +225,15 @@ def saveResult(result, loop):
     return
 
 def main():
-    global loop, subloop, winsize
+    global loop, subloop, length
 
-    # dictRet = {}
-    # for key in dictTest:
-    #     dictRet[key] = eval(key)(data,winsize)
+    dictRet = {}
+    for key in dictTest:
+        dictRet[key] = eval(key)(length)
 
-    # ret = checkRet(dictRet)
-    # if ret != True:
-    #     return
+    ret = checkRet(dictRet)
+    if ret != True:
+        return
     
     result = {}
     for key in dictTest:
