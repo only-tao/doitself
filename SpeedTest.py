@@ -34,7 +34,7 @@ dictTest ={
         # 'calMaOpt'  : 'Numpy Optimized Ma',
         'calSquareRootAndSquare_JIT'  : 'Numba JIT',
         'calSquareRootAndSquare_AOT'  : 'Numba AOT',
-        'calSquareRootAndSquare_CY'   : 'Cython Module',
+        'calSRaddS_CY'   : 'Cython Module',
         'calSquareRootAndSquare_PyC'  : 'C Module VC',
         'calSquareRootAndSquare_PyCG' : 'C Module GCC',
         'calSquareRootAndSquare_DLL'  : 'ctypes DLL VC',
@@ -43,38 +43,63 @@ dictTest ={
 }
 
 
-dlllib_DLL = npct.load_library("calSquareRootAndSquare_DLL",".")
-dlllib.calSquareRootAndSquare_DLL.argtypes = [c_int]
+dlllib_DLL = npct.load_library("calSRaddS_DLL",".")
+dlllib_DLL.calSquareRootAndSquare_DLL.argtypes = [c_int,
+                                                    npct.ndpointer(dtype=np.float64, ndim=1, flags="C_CONTIGUOUS")]
 
 dlllib_DLL_gcc = CDLL("./calSquareRootAndSquare_DLL_gcc.dll")
-dlllib.calSquareRootAndSquare_DLL.argtypes = [c_int]
+dlllib_DLL_gcc.calSquareRootAndSquare_DLL.argtypes = [c_int,
+                                                      npct.ndpointer(dtype=np.float64, ndim=1, flags="C_CONTIGUOUS")]
 
 dlllib_OMP = CDLL("./calSRaddS_OMP.dll")
-dlllib.calSquareRootAndSquare_DLL.argtypes = [c_int]
+dlllib_OMP.calSquareRootAndSquare_DLL.argtypes = [c_int,
+                                                  npct.ndpointer(dtype=np.float64, ndim=1, flags="C_CONTIGUOUS")]
+
 
 def calSquareRootAndSquare_OMP(N):
     global dlllib_OMP
-    result = np.zeros(N, dtype=np.float64)
-    result = dlllib_OMP.calSquareRootAndSquare_DLL(N)
+    result = np.empty((N,), dtype=np.float64)
+    dlllib_OMP.calSquareRootAndSquare_DLL(N,result)
     return result
     
 def calSquareRootAndSquare_DLL_gcc(N):
     global dlllib_DLL_gcc
-    result = dlllib_DLL_gcc.calSquareRootAndSquare_DLL(N)
+    result = np.empty((N,), dtype=np.float64)
+
+    dlllib_DLL_gcc.calSquareRootAndSquare_DLL(N,result)
     return result
 
 def calSquareRootAndSquare_DLL(N):
-    global dlllib
-    result = dlllib.calSquareRootAndSquare_DLL(N)
+    global dlllib_DLL
+    result = np.empty((N,), dtype=np.float64)
+    # use np.zeros()  ??? 
+    dlllib_DLL.calSquareRootAndSquare_DLL(N,result)
     return result
-
+def calSRaddS_CY(N):
+    result = np.empty((N,),dtype=np.float64)   
+    calSquareRootAndSquare_CY(N,result)
+    return result
 @njit
-def calSquareRootAndSquare_OP(N):
+def calSquareRootAndSquare_JIT(N):
     result = np.zeros(N, dtype=np.float64)
     for i in range(N):
         result[i] = math.sqrt(i)+ math.pow(i,2)
     return result
 
+def calSquareRootAndSquare_OP(N):
+    x1 = np.array(range(N))
+    x2 = np.array(range(N))
+    x1 = np.sqrt(x1) 
+    x2 = np.power(x2,2)
+    result = x1 + x2
+    return result
+
+
+def calSquareRootAndSquare(N):
+    result = np.zeros(N, dtype=np.float64)
+    for i in range(N):
+        result[i] = math.sqrt(i)+ math.pow(i,2)
+    return result
 # def calMaOpt(d, window): # 前n项和问题！ 
 #     if d.size <= window:
 #         return np.zeros(d.size, dtype=np.float64)
@@ -88,10 +113,7 @@ def calSquareRootAndSquare_OP(N):
 #         m[i+adjust] = s/window
 #     return m
 
-def calSquareRootAndSquare(N):
-    for i in range(N):
-        result = math.sqrt(i)+ math.pow(i,2)
-    return result
+
 '''
 beforeCal=datetime.datetime.now()
 for number in range(100000):
@@ -151,15 +173,16 @@ def getSysInfo():
     return name, output
 
 def getTestInfo():
-    global loop, subloop, winsize, length, data
-    datatype = type(data[0])
+    global loop, subloop, winsize, length
+    # global data
+    # datatype = type(data[0])
     output = '###### Test Information \n'
     output += '||| \n'
     output += '|:---|:---| \n'
     output += '|{}|{} * {}| \n'.format('Loop Number', loop, subloop)
     output += '|{}|{:,}| \n'.format('Data Size', length)
-    output += '|{}|{}| \n'.format('Window Size', winsize)
-    output += '|{}|{}| \n'.format('Data Type', str(datatype).lstrip('<class').rstrip('>').strip().strip("'"))
+    # output += '|{}|{}| \n'.format('Window Size', winsize)
+    # output += '|{}|{}| \n'.format('Data Type', str(datatype).lstrip('<class').rstrip('>').strip().strip("'"))
     return output
 
 def saveResult(result, loop):
@@ -191,13 +214,13 @@ def saveResult(result, loop):
 def main():
     global loop, subloop, winsize
 
-    dictRet = {}
-    for key in dictTest:
-        dictRet[key] = eval(key)(data,winsize)
+    # dictRet = {}
+    # for key in dictTest:
+    #     dictRet[key] = eval(key)(data,winsize)
 
-    ret = checkRet(dictRet)
-    if ret != True:
-        return
+    # ret = checkRet(dictRet)
+    # if ret != True:
+    #     return
     
     result = {}
     for key in dictTest:
@@ -207,13 +230,13 @@ def main():
         print('time : ', i+1)
 
         for key in dictTest:# each dict item: calMa or calMaCov
-            strCmd = '{}(data,winsize)'.format(key) # 执行cmd
-            strSetup = 'from __main__ import {},data,winsize'.format(key) # data,winsize是传入的参数
+            strCmd = '{}(length)'.format(key) # 执行cmd
+            strSetup = 'from __main__ import {},length'.format(key) # data,winsize是传入的参数
             ret = timeit(strCmd, setup=strSetup, number = subloop) # use timeit as the stand test lib function
-            print('{:<10} : {} '.format(key, ret))
+            print('{:<20} : {} '.format(key, ret))
             result[key].append(ret)
             
-    avgbase = sum(result['calMa'][1:])/loop
+    avgbase = sum(result['calSquareRootAndSquare'][1:])/loop
     for key in result:
         avg = sum(result[key][1:])/loop # count avg
         faster = avgbase/avg # count accelerate radio
